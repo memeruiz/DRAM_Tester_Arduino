@@ -103,6 +103,11 @@ void error(int r, int c)
   interrupts();
   Serial.print(" FAILED $");
   Serial.println(a, HEX);
+  for (int i=0; i<40; i++) {
+    Serial.print("\a\a\n");
+    delay(100);
+    Serial.flush();
+  }
   Serial.flush();
   while (1)
     ;
@@ -113,7 +118,12 @@ void ok(void)
   digitalWrite(R_LED, HIGH);
   digitalWrite(G_LED, LOW);
   interrupts();
-  Serial.println(" OK!");
+  Serial.println("\n\r OK!");
+  for (int i=0; i<10; i++) {
+    Serial.print("\a\a\n");
+    delay(100);
+    Serial.flush();
+  }
   Serial.flush();
   while (1)
     ;
@@ -132,6 +142,44 @@ void green(int v) {
   digitalWrite(G_LED, v);
 }
 
+void print_perc(int r, int c) {
+  unsigned long perc=100*((unsigned long) c)/(1<<bus_size);
+  Serial.print("\r");
+  Serial.print(perc, DEC);
+  Serial.print(" %   ");
+  Serial.print("Addr: 0x");
+  Serial.print(((unsigned long) c)*(1<<((unsigned long) bus_size)), HEX);
+  Serial.flush();
+}
+
+#define STEP 128
+void print_c(int r, int c) {
+  unsigned long a = ((unsigned long)c << bus_size) + r;
+
+  if ((c % STEP) == 0) {
+      Serial.println();
+      Serial.print("Dir: r:");
+      Serial.print(r, HEX);
+      Serial.print(", c:");
+      Serial.print(c, HEX);
+      Serial.print(", a:");
+      Serial.print(a, HEX);
+      Serial.print(", Size:");
+      Serial.print((1<<bus_size), HEX);
+      Serial.print(" ");
+      Serial.print((1<<bus_size), DEC);
+      
+            Serial.println();
+      Serial.flush();
+  }
+}
+void print_r(int r, int c) {
+  if ((r % STEP) == 0) {
+      Serial.print(r, HEX);
+      Serial.print(". ");
+      Serial.flush();
+  }
+}
 void fill(int v) {
   int r, c, g = 0;
   v &= 1;
@@ -139,9 +187,12 @@ void fill(int v) {
     green(g? HIGH : LOW);
     for (r = 0; r < (1<<bus_size); r++) {
       writeAddress(r, c, v);
+      
       if (v != readAddress(r, c))
         error(r, c);
     }
+    print_c(r, c);
+    print_perc(r, c);
     g ^= 1;
   }
   blink();
@@ -154,10 +205,13 @@ void fillx(int v) {
     green(g? HIGH : LOW);
     for (r = 0; r < (1<<bus_size); r++) {
       writeAddress(r, c, v);
+      
       if (v != readAddress(r, c))
         error(r, c);
       v ^= 1;
     }
+    print_c(r, c);
+    print_perc(r, c);
     g ^= 1;
   }
   blink();
@@ -166,12 +220,14 @@ void fillx(int v) {
 void setup() {
   int i;
 
-  Serial.begin(9600);
+  Serial.begin(115200);
   while (!Serial)
     ; /* wait */
 
   Serial.println();
-  Serial.print("DRAM TESTER ");
+  Serial.print("\x1b[2J");
+  Serial.print("\a");
+  Serial.print("DRAM TESTER \n\r");
 
   for (i = 0; i < BUS_SIZE; i++)
     pinMode(a_bus[i], OUTPUT);
@@ -203,6 +259,7 @@ void setup() {
     bus_size = BUS_SIZE - 1;
     Serial.print("64Kx1 ");
   }
+  Serial.println();
   Serial.flush();
 
   digitalWrite(R_LED, LOW);
@@ -218,9 +275,13 @@ void setup() {
 }
 
 void loop() {
-  interrupts(); Serial.print("."); Serial.flush(); noInterrupts(); fillx(0);
-  interrupts(); Serial.print("."); Serial.flush(); noInterrupts(); fillx(1);
-  interrupts(); Serial.print("."); Serial.flush(); noInterrupts(); fill(0);
-  interrupts(); Serial.print("."); Serial.flush(); noInterrupts(); fill(1);
+  interrupts(); 
+  Serial.print("Write 0s\n"); Serial.flush(); noInterrupts(); fillx(0);
+  Serial.print("\n\rDone\n"); Serial.flush();
+  interrupts(); Serial.print("\r\nWrite 1s\n"); Serial.flush(); noInterrupts(); fillx(1);
+    Serial.print("\n\rDone\n"); Serial.flush();
+  interrupts(); Serial.print("\r\nWrite 0s\n"); Serial.flush(); noInterrupts(); fill(0);
+    Serial.print("\n\rDone\n"); Serial.flush();
+  interrupts(); Serial.print("\r\nWrite 1s\n\r"); Serial.flush(); noInterrupts(); fill(1);
   ok();
 }
